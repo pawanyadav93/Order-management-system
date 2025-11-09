@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Management System</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        :root {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        /* Custom Status Badges */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.35rem 0.9rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .status-Pending { @apply bg-yellow-50 text-yellow-700 border border-yellow-200; }
+        .status-Processing { @apply bg-blue-50 text-blue-700 border border-blue-200; }
+        .status-Shipped { @apply bg-indigo-50 text-indigo-700 border border-indigo-200; }
+        .status-Delivered { @apply bg-green-50 text-green-700 border border-green-200; }
+        .status-Cancelled { @apply bg-red-50 text-red-700 border border-red-200; }
+        
+        /* Modal Transitions */
+        .modal-overlay {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        .modal-overlay.open {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Table Row Hover Effect */
+        #orders-list tr:hover {
+            background-color: theme('colors.indigo.50');
+        }
+
+        /* Hide dashboard initially */
+        #app {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+    <!-- Auth Container (Sign In / Register) -->
+    <div id="auth-container" class="flex items-center justify-center min-h-screen p-4">
+        <div class="w-full max-w-md">
+            <div class="bg-white p-8 sm:p-10 rounded-xl shadow-2xl border-t-8 border-indigo-600">
+                <h2 class="text-3xl font-extrabold text-gray-900 text-center mb-1">
+                    Welcome to <span class="text-indigo-600">OMS</span>
+                </h2>
+                <p class="text-center text-gray-500 mb-8" id="auth-subtitle">Sign in to continue</p>
+                
+                <form id="login-form">
+                    <div class="mb-4">
+                        <label for="login-email" class="block text-sm font-medium text-gray-700">Email Address</label>
+                        <input type="email" id="login-email" required placeholder="Enter your email" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div class="mb-6">
+                        <label for="login-password" class="block text-sm font-medium text-gray-700">Password</label>
+                        <input type="password" id="login-password" required placeholder="Enter your password" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <p id="login-error" class="text-sm text-red-600 mb-4 text-center hidden"></p>
+                    <button type="submit" class="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition duration-150">
+                        Sign In
+                    </button>
+                </form>
+
+                <p class="mt-6 text-center text-sm text-gray-600">
+                    Don't have an account? 
+                    <button type="button" id="open-register-modal-btn" class="font-semibold text-indigo-600 hover:text-indigo-500 transition duration-150">
+                        Register here
+                    </button>
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Registration Modal -->
+    <div id="register-modal-overlay" class="modal-overlay fixed inset-0 bg-gray-900 bg-opacity-80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div id="register-modal-content" class="bg-white rounded-xl shadow-2xl w-full max-w-md transform scale-95 transition-all duration-300">
+            <form id="register-form" class="p-8">
+                <h2 class="text-2xl font-bold mb-6 text-gray-800 border-b pb-3">Create New Account</h2>
+                
+                <div class="mb-4">
+                    <label for="reg-name" class="block text-sm font-medium text-gray-700">Full Name</label>
+                    <input type="text" id="reg-name" required class="mt-1 block w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div class="mb-4">
+                    <label for="reg-email" class="block text-sm font-medium text-gray-700">Email (Used for Login)</label>
+                    <input type="email" id="reg-email" required class="mt-1 block w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="reg-password" class="block text-sm font-medium text-gray-700">Password</label>
+                        <input type="password" id="reg-password" required minlength="6" class="mt-1 block w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label for="reg-mobile" class="block text-sm font-medium text-gray-700">Mobile No.</label>
+                        <input type="text" id="reg-mobile" required class="mt-1 block w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                </div>
+                <p id="reg-error" class="text-sm text-red-600 mb-4 text-center hidden"></p>
+
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" id="close-register-modal-btn" class="px-6 py-2.5 text-gray-700 bg-gray-200 font-semibold rounded-xl hover:bg-gray-300 transition duration-150">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-8 py-2.5 bg-green-600 text-white font-bold rounded-xl shadow-md hover:bg-green-700 transition duration-150">
+                        Register
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- Main Application Container (Dashboard) -->
+    <div id="app" class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+        
+        <!-- Header -->
+        <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10 pb-4 border-b border-indigo-200">
+            <h1 class="text-4xl font-extrabold text-gray-900 mb-2 sm:mb-0 tracking-tight">
+                <span class="text-indigo-600">Order Management</span> System
+            </h1>
+            <div class="flex items-center space-x-4">
+                <!-- Updated User Display -->
+                <div class="text-right text-sm font-medium text-gray-600 bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
+                    <div class="font-bold text-gray-800" id="user-display-name"></div>
+                    <div class="text-xs text-indigo-500 mt-0.5" id="user-display-id"></div>
+                </div>
+                <button id="add-order-btn" class="px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition duration-300 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] flex items-center">
+                    <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                    New Order
+                </button>
+                <button id="logout-btn" class="px-4 py-2.5 bg-red-500 text-white font-semibold rounded-xl shadow-lg hover:bg-red-600 transition duration-150">
+                    Logout
+                </button>
+            </div>
+        </header>
+
+        <!-- Status Message -->
+        <div id="status-message" class="text-center py-4 mb-4 text-sm text-gray-600">
+            Data is stored locally in your browser's LocalStorage.
+        </div>
+        
+        <!-- Analytics Summary Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            <!-- Total Orders Card -->
+            <div class="bg-white p-6 rounded-xl shadow-xl border-t-4 border-indigo-500 transition duration-300 hover:shadow-2xl hover:border-indigo-600">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-indigo-50 p-3 rounded-full">
+                        <svg class="h-7 w-7 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2m-9 0V3h4v2m-4 0h4"></path></svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-base font-medium text-gray-500">Total Orders</p>
+                        <p id="total-orders-count" class="text-3xl font-extrabold text-gray-900 mt-1">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total Revenue Card -->
+            <div class="bg-white p-6 rounded-xl shadow-xl border-t-4 border-green-500 transition duration-300 hover:shadow-2xl hover:border-green-600">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-green-50 p-3 rounded-full">
+                        <svg class="h-7 w-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V4m0 16v-4m-6-2h12"></path></svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-base font-medium text-gray-500">Total Revenue</p>
+                        <p id="total-revenue-amount" class="text-3xl font-extrabold text-gray-900 mt-1">₹0.00</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pending Orders Card -->
+            <div class="bg-white p-6 rounded-xl shadow-xl border-t-4 border-yellow-500 transition duration-300 hover:shadow-2xl hover:border-yellow-600">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-yellow-50 p-3 rounded-full">
+                        <svg class="h-7 w-7 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-base font-medium text-gray-500">Pending Orders</p>
+                        <p id="pending-orders-count" class="text-3xl font-extrabold text-gray-900 mt-1">0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Filter Bar -->
+        <div class="flex flex-col sm:flex-row gap-4 mb-6">
+            <div class="flex-grow">
+                <label for="search-input" class="sr-only">Search Orders</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </div>
+                    <input type="text" id="search-input" placeholder="Search by Customer Name or ID..." class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl shadow-inner focus:ring-indigo-500 focus:border-indigo-500 transition duration-150">
+                </div>
+            </div>
+            <div>
+                <label for="filter-status" class="sr-only">Filter by Status</label>
+                <select id="filter-status" class="w-full sm:w-48 px-3 py-2.5 border border-gray-300 rounded-xl shadow-inner focus:ring-indigo-500 focus:border-indigo-500 bg-white transition duration-150">
+                    <option value="All">All Statuses</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Processing">Processing</option>
+                    <option value="Shipped">Shipped</option>
+                    <option value="Delivered">Delivered</option>
+                    <option value="Cancelled">Cancelled</option>
+                </select>
+            </div>
+        </div>
+        
+        <!-- Orders Table -->
+        <div class="bg-white shadow-2xl rounded-xl overflow-hidden mt-6">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-indigo-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-indigo-700 uppercase tracking-wider">Order ID</th>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-indigo-700 uppercase tracking-wider">Customer</th>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-indigo-700 uppercase tracking-wider">Amount</th>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-indigo-700 uppercase tracking-wider">Status</th>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-indigo-700 uppercase tracking-wider">Last Updated</th> 
+                            <th scope="col" class="relative px-6 py-4"><span class="sr-only">Actions</span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="orders-list" class="bg-white divide-y divide-gray-100">
+                        <tr><td colspan="6" class="p-8 text-center text-gray-400">Loading orders...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Order Modal (Add/Edit) -->
+    <div id="order-modal-overlay" class="modal-overlay fixed inset-0 bg-gray-900 bg-opacity-80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div id="order-modal-content" class="bg-white rounded-xl shadow-2xl w-full max-w-lg transform scale-95 transition-all duration-300">
+            <form id="order-form" class="p-8">
+                <h2 id="modal-title" class="text-2xl font-bold mb-6 text-gray-800 border-b pb-3">Add New Order</h2>
+                
+                <input type="hidden" id="order-id-input">
+
+                <div class="mb-5">
+                    <label for="customer-name" class="block text-sm font-semibold text-gray-700 mb-1">Customer Name</label>
+                    <input type="text" id="customer-name" required class="w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 mb-5">
+                    <div>
+                        <label for="total-amount" class="block text-sm font-semibold text-gray-700 mb-1">Total Amount (₹)</label>
+                        <input type="number" step="0.01" min="0" id="total-amount" required class="w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150">
+                    </div>
+                    <div>
+                        <label for="order-status" class="block text-sm font-semibold text-gray-700 mb-1">Status</label>
+                        <select id="order-status" required class="w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white transition duration-150">
+                            <option value="Pending">Pending</option>
+                            <option value="Processing">Processing</option>
+                            <option value="Shipped">Shipped</option>
+                            <option value="Delivered">Delivered</option>
+                            <option value="Cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <label for="order-date" class="block text-sm font-semibold text-gray-700 mb-1">Order Date</label>
+                    <input type="date" id="order-date" required class="w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150">
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="close-modal-btn" class="px-6 py-2.5 text-gray-700 bg-gray-200 font-semibold rounded-xl hover:bg-gray-300 transition duration-150">
+                        Cancel
+                    </button>
+                    <button type="submit" id="save-order-button" class="px-8 py-2.5 bg-indigo-600 text-white font-bold rounded-xl shadow-md hover:bg-indigo-700 transition duration-150">
+                        Save Order
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Confirmation/Message Modal -->
+    <div id="message-modal-overlay" class="modal-overlay fixed inset-0 bg-gray-900 bg-opacity-80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm transform scale-95 transition-all duration-300 p-8 text-center">
+            <h3 id="message-title" class="text-2xl font-bold text-gray-800 mb-3">Confirm Deletion</h3>
+            <p id="message-text" class="text-gray-600 mb-8">Are you sure you want to delete this order? This action cannot be undone.</p>
+            <div class="flex justify-center space-x-4">
+                <button type="button" id="confirm-cancel-btn" class="px-6 py-2 text-gray-700 bg-gray-200 font-semibold rounded-xl hover:bg-gray-300 transition duration-150">
+                    Cancel
+                </button>
+                <button type="button" id="confirm-action-btn" class="px-6 py-2 bg-red-600 text-white font-bold rounded-xl shadow-md hover:bg-red-700 transition duration-150">
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Simple JavaScript Logic using localStorage -->
+    <script>
+        // --- AUTH CONSTANTS AND STATE ---
+        const USER_STORAGE_KEY = 'simpleOrderManager_users';
+        const SESSION_KEY = 'simpleOrderManager_activeUser';
+        let activeUser = JSON.parse(localStorage.getItem(SESSION_KEY));
+        let allUsers = loadUsers(); 
+
+        // --- GLOBAL CONSTANTS AND DOM REFERENCES ---
+        let currentUserId = activeUser ? activeUser.id : null;
+        
+        // Dynamic key for orders, scoped to the logged-in user
+        function getOrderStorageKey() {
+            return currentUserId ? `simpleOrderManager_orders_${currentUserId}` : null;
+        }
+
+        let allOrders = []; // User-specific orders will be loaded after login
+        let pendingDeleteId = null;
+
+        // DOM Elements
+        const authContainerEl = document.getElementById('auth-container');
+        const appContainerEl = document.getElementById('app');
+        
+        // Login elements
+        const loginForm = document.getElementById('login-form');
+        const loginEmailInput = document.getElementById('login-email');
+        const loginPasswordInput = document.getElementById('login-password');
+        const loginErrorEl = document.getElementById('login-error');
+        
+        // Register elements
+        const registerModalOverlay = document.getElementById('register-modal-overlay');
+        const registerForm = document.getElementById('register-form');
+        const openRegisterBtn = document.getElementById('open-register-modal-btn');
+        const closeRegisterBtn = document.getElementById('close-register-modal-btn');
+        const regErrorEl = document.getElementById('reg-error');
+
+        // Dashboard Elements
+        const ordersListEl = document.getElementById('orders-list');
+        const addOrderBtn = document.getElementById('add-order-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const searchInputEl = document.getElementById('search-input');
+        const filterStatusEl = document.getElementById('filter-status');
+        const userDisplayNameEl = document.getElementById('user-display-name');
+        const userDisplayIdEl = document.getElementById('user-display-id');
+
+        // Analytics Elements
+        const totalOrdersCountEl = document.getElementById('total-orders-count');
+        const totalRevenueAmountEl = document.getElementById('total-revenue-amount');
+        const pendingOrdersCountEl = document.getElementById('pending-orders-count');
+        
+        // Order Modal elements (remain the same)
+        const orderModalOverlay = document.getElementById('order-modal-overlay');
+        const modalTitle = document.getElementById('modal-title');
+        const orderForm = document.getElementById('order-form');
+        const orderIdInput = document.getElementById('order-id-input');
+        const customerNameInput = document.getElementById('customer-name');
+        const totalAmountInput = document.getElementById('total-amount');
+        const orderStatusSelect = document.getElementById('order-status');
+        const orderDateInput = document.getElementById('order-date');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        
+        // Message/Confirmation Modal elements (remain the same)
+        const messageModalOverlay = document.getElementById('message-modal-overlay');
+        const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
+        const confirmActionBtn = document.getElementById('confirm-action-btn');
+        
+        // Helper to format currency (Indian Rupee - INR)
+        const formatter = new Intl.NumberFormat('en-IN', {
+            style: 'currency',
+            currency: 'INR',
+        });
+        
+        // Simple UUID-like generator
+        function generateId() {
+            return Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+        }
+
+        // --- AUTHENTICATION LOGIC ---
+        
+        function loadUsers() {
+            try {
+                const data = localStorage.getItem(USER_STORAGE_KEY);
+                return data ? JSON.parse(data) : [];
+            } catch (error) {
+                console.error("Error loading users from localStorage:", error);
+                return [];
+            }
+        }
+        
+        function saveUsers() {
+             try {
+                localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(allUsers));
+            } catch (error) {
+                console.error("Error saving users to localStorage:", error);
+            }
+        }
+        
+        function handleRegister(e) {
+            e.preventDefault();
+            regErrorEl.classList.add('hidden');
+
+            const email = document.getElementById('reg-email').value.trim();
+            const password = document.getElementById('reg-password').value.trim();
+            const name = document.getElementById('reg-name').value.trim();
+            const mobile = document.getElementById('reg-mobile').value.trim();
+            
+            if (allUsers.some(u => u.email === email)) {
+                regErrorEl.textContent = "Error: This email is already registered.";
+                regErrorEl.classList.remove('hidden');
+                return;
+            }
+
+            const newUser = {
+                id: generateId(),
+                name: name,
+                email: email,
+                password: password, // WARNING: Plain text storage is insecure. Use hashing in a real app.
+                mobile: mobile
+            };
+            
+            allUsers.push(newUser);
+            saveUsers();
+            
+            // Auto-login new user
+            activeUser = { id: newUser.id, name: newUser.name };
+            localStorage.setItem(SESSION_KEY, JSON.stringify(activeUser));
+            
+            closeRegisterModal();
+            initApp();
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            loginErrorEl.classList.add('hidden');
+            
+            const email = loginEmailInput.value.trim();
+            const password = loginPasswordInput.value.trim();
+
+            const user = allUsers.find(u => u.email === email && u.password === password);
+            
+            if (user) {
+                activeUser = { id: user.id, name: user.name };
+                localStorage.setItem(SESSION_KEY, JSON.stringify(activeUser));
+                initApp();
+            } else {
+                loginErrorEl.textContent = "Error: Invalid email or password.";
+                loginErrorEl.classList.remove('hidden');
+            }
+        }
+        
+        function handleLogout() {
+            activeUser = null;
+            currentUserId = null;
+            localStorage.removeItem(SESSION_KEY);
+            // Clear inputs for security
+            loginForm.reset(); 
+            // Switch view back to auth
+            initApp(); 
+        }
+
+        // --- ORDER DATA MANAGEMENT (User-Scoped) ---
+        
+        function loadOrders() {
+            currentUserId = activeUser.id; // Set the user ID for order loading
+            const key = getOrderStorageKey();
+            if (!key) return;
+
+            try {
+                const data = localStorage.getItem(key);
+                allOrders = data ? JSON.parse(data) : [];
+            } catch (error) {
+                console.error("Error loading user orders from localStorage:", error);
+                allOrders = [];
+            }
+            renderOrders();
+        }
+
+        function saveOrders() {
+            const key = getOrderStorageKey();
+            if (!key) return;
+            
+            try {
+                localStorage.setItem(key, JSON.stringify(allOrders));
+                renderOrders(); 
+            } catch (error) {
+                console.error("Error saving user orders to localStorage:", error);
+            }
+        }
+
+
+        // --- UI UTILITY FUNCTIONS (Modals) ---
+        
+        function openRegisterModal() {
+            registerForm.reset();
+            regErrorEl.classList.add('hidden');
+            registerModalOverlay.classList.add('open');
+        }
+
+        function closeRegisterModal() {
+            registerModalOverlay.classList.remove('open');
+        }
+
+        function openOrderModal(order = null) {
+            orderForm.reset();
+            orderIdInput.value = '';
+            
+            if (order) {
+                modalTitle.textContent = 'Edit Order';
+                orderIdInput.value = order.id;
+                customerNameInput.value = order.customerName;
+                totalAmountInput.value = order.totalAmount;
+                orderStatusSelect.value = order.status;
+                orderDateInput.value = order.orderDate; 
+            } else {
+                modalTitle.textContent = 'Add New Order';
+                orderDateInput.value = new Date().toISOString().split('T')[0];
+                orderStatusSelect.value = 'Pending';
+            }
+            orderModalOverlay.classList.add('open');
+            document.getElementById('order-modal-content').classList.remove('scale-95');
+            document.getElementById('order-modal-content').classList.add('scale-100');
+        }
+
+        function closeOrderModal() {
+            document.getElementById('order-modal-content').classList.remove('scale-100');
+            document.getElementById('order-modal-content').classList.add('scale-95');
+            setTimeout(() => {
+                orderModalOverlay.classList.remove('open');
+            }, 300);
+        }
+        
+        function openMessageModal(action, title, message, isDelete = false) {
+            document.getElementById('message-title').textContent = title;
+            document.getElementById('message-text').textContent = message;
+            messageModalOverlay.classList.add('open');
+            confirmActionBtn.textContent = action;
+            confirmActionBtn.className = `px-6 py-2 font-bold rounded-xl shadow-md transition duration-150 ${isDelete ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`;
+        }
+
+        function closeMessageModal() {
+            messageModalOverlay.classList.remove('open');
+            pendingDeleteId = null;
+        }
+
+
+        // --- CRUD OPERATIONS (LOCAL STORAGE) ---
+        
+        function handleSaveOrder(e) {
+            e.preventDefault();
+
+            const isEdit = !!orderIdInput.value;
+            const orderId = orderIdInput.value || generateId();
+
+            const newOrderData = {
+                id: orderId,
+                customerName: customerNameInput.value.trim(),
+                totalAmount: parseFloat(totalAmountInput.value),
+                status: orderStatusSelect.value,
+                orderDate: orderDateInput.value, 
+                updatedAt: Date.now(),
+            };
+
+            if (isEdit) {
+                const index = allOrders.findIndex(o => o.id === orderId);
+                if (index !== -1) {
+                    const createdAt = allOrders[index].createdAt; 
+                    allOrders[index] = { ...newOrderData, createdAt: createdAt || Date.now() };
+                }
+            } else {
+                allOrders.unshift({ 
+                    ...newOrderData, 
+                    createdAt: Date.now() 
+                });
+            }
+            
+            saveOrders();
+            closeOrderModal();
+        }
+        
+        function handleDeleteConfirmed() {
+            if (!pendingDeleteId) return;
+
+            allOrders = allOrders.filter(o => o.id !== pendingDeleteId);
+            saveOrders(); 
+            closeMessageModal();
+        }
+        
+        function handleDeleteClick(orderId) {
+            pendingDeleteId = orderId;
+            openMessageModal('Delete', 'Confirm Deletion', `Are you sure you want to delete order ID ${orderId.substring(0, 8)}...?`, true);
+        }
+
+
+        // --- UI RENDERING & VIEW MANAGEMENT ---
+
+        function renderAuth() {
+            authContainerEl.style.display = 'flex';
+            appContainerEl.style.display = 'none';
+        }
+
+        function renderApp() {
+            if (!activeUser) return renderAuth();
+            
+            authContainerEl.style.display = 'none';
+            appContainerEl.style.display = 'block';
+
+            // Update user display info
+            userDisplayNameEl.textContent = activeUser.name;
+            userDisplayIdEl.textContent = `ID: ${activeUser.id.substring(0, 10)}...`;
+
+            // Load user-specific orders
+            loadOrders();
+        }
+
+        function updateAnalyticsSummary() {
+            const totalOrders = allOrders.length;
+            const totalRevenue = allOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+            const pendingOrders = allOrders.filter(order => order.status === 'Pending').length;
+
+            totalOrdersCountEl.textContent = totalOrders;
+            totalRevenueAmountEl.textContent = formatter.format(totalRevenue);
+            pendingOrdersCountEl.textContent = pendingOrders;
+        }
+
+        function createOrderRow(order) {
+            const row = document.createElement('tr');
+            row.className = 'transition duration-150 cursor-pointer'; // Added cursor-pointer
+            
+            const updatedAt = new Date(order.updatedAt || order.createdAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' });
+            
+            row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">${order.id.substring(0, 10)}...</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${order.customerName}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${formatter.format(order.totalAmount)}</td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="status-badge status-${order.status}">${order.status}</span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
+                    <div class="font-medium text-gray-700">${updatedAt}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button data-id="${order.id}" class="edit-btn text-indigo-600 hover:text-indigo-800 font-semibold mr-4 transition duration-150">Edit</button>
+                    <button data-id="${order.id}" class="delete-btn text-red-600 hover:text-red-800 font-semibold transition duration-150">Delete</button>
+                </td>
+            `;
+            // Add click listener to the whole row to open edit modal
+            row.addEventListener('click', (e) => {
+                // Only trigger edit if click target is not a button
+                if (!e.target.closest('button')) {
+                    const orderToEdit = allOrders.find(o => o.id === order.id); 
+                    if (orderToEdit) openOrderModal(orderToEdit);
+                }
+            });
+            
+            return row;
+        }
+
+        function renderOrders() {
+            ordersListEl.innerHTML = '';
+            
+            const searchTerm = searchInputEl.value.toLowerCase().trim();
+            const filterStatus = filterStatusEl.value;
+            
+            let filteredOrders = allOrders.filter(order => {
+                const matchesSearch = searchTerm === '' || 
+                                    order.customerName.toLowerCase().includes(searchTerm) ||
+                                    order.id.toLowerCase().includes(searchTerm);
+
+                const matchesStatus = filterStatus === 'All' || order.status === filterStatus;
+
+                return matchesSearch && matchesStatus;
+            });
+
+            filteredOrders.sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
+
+            if (filteredOrders.length === 0) {
+                ordersListEl.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-gray-400">No orders match your current criteria.</td></tr>';
+                updateAnalyticsSummary();
+                return;
+            }
+
+            filteredOrders.forEach(order => {
+                const row = createOrderRow(order);
+                ordersListEl.appendChild(row);
+            });
+
+            // Re-attach delete listeners (edit is attached to row itself now)
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Stop row click event
+                    handleDeleteClick(btn.getAttribute('data-id'));
+                });
+            });
+
+            updateAnalyticsSummary(); 
+        }
+        
+        function initApp() {
+            if (activeUser) {
+                renderApp();
+            } else {
+                renderAuth();
+            }
+        }
+
+
+        // --- INITIALIZATION ---
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            // Setup Auth Event Listeners
+            loginForm.addEventListener('submit', handleLogin);
+            logoutBtn.addEventListener('click', handleLogout);
+            registerForm.addEventListener('submit', handleRegister);
+            openRegisterBtn.addEventListener('click', openRegisterModal);
+            closeRegisterBtn.addEventListener('click', closeRegisterModal);
+
+            // Setup Dashboard Event Listeners
+            orderForm.addEventListener('submit', handleSaveOrder);
+            addOrderBtn.addEventListener('click', () => openOrderModal());
+            closeModalBtn.addEventListener('click', closeOrderModal);
+            
+            // Closing modals by clicking outside
+            orderModalOverlay.addEventListener('click', (e) => {
+                if (e.target === orderModalOverlay) closeOrderModal();
+            });
+            registerModalOverlay.addEventListener('click', (e) => {
+                if (e.target === registerModalOverlay) closeRegisterModal();
+            });
+            
+            // Confirmation Modal actions
+            confirmCancelBtn.addEventListener('click', closeMessageModal);
+            confirmActionBtn.addEventListener('click', handleDeleteConfirmed);
+
+            // Filter and Search inputs trigger re-render
+            searchInputEl.addEventListener('input', renderOrders);
+            filterStatusEl.addEventListener('change', renderOrders);
+
+            // Initial view load
+            initApp();
+        });
+    </script>
+</body>
+</html>
